@@ -19,8 +19,7 @@ struct MLPTrainer {
         float error,
         int maxEpochs,
         std::span<const float> inputs,
-        std::span<const float> outputs,
-        int samples
+        std::span<const float> outputs
     ) -> float {
         errors_.resize(trainee.neurons().size());
         derived_.resize(errors_.size() - trainee.topology()[0]);
@@ -32,8 +31,9 @@ struct MLPTrainer {
 
         auto achievedError = 9999999.0f;
 
-        const auto inputSize = inputs.size() / samples;
-        const auto outputSize = outputs.size() / samples;
+        const auto inputSize = trainee.topology().front();
+        const auto outputSize = trainee.topology().back();
+        const auto samples = inputs.size() / inputSize;
 
         auto indexes = std::vector<int>(samples);
         for (auto i = 0u; i < indexes.size(); ++i) {

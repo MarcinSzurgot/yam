@@ -23,7 +23,7 @@ TEST(TestMLTrainer, testBackpropagation) {
         0.0f
     };
 
-    const auto error = trainer.train(mlp, 10, 0.01, 1000000, input, expected, 4);
+    const auto error = trainer.train(mlp, 10, 0.01, 1000000, input, expected);
 
     for (const auto w : mlp.weights()) {
         std::cout << w << ", ";
