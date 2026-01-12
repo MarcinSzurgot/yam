@@ -86,7 +86,11 @@ struct MLPTrainer {
         derive(trainee.structure().neurons(), derivative);
         const auto layers = trainee.structure().topology().size();
 
-        lastLayerError(expected, actual);
+        auto error = errors_.row(errors_.rows().size() - 1);
+        auto derived = derived_.row(derived_.rows().size() - 1);
+        for (auto i = 0u; i < expected.size(); ++i) {
+            error[i] = derived[i] * (expected[i] - actual[i]);
+        }
 
         for (auto layer = layers - 1; layer > 1u; --layer) {
             hiddenLayerError(trainee, layer - 1);
@@ -94,17 +98,6 @@ struct MLPTrainer {
         }
 
         correct(trainee, learnrate, 0);
-    }
-
-    void lastLayerError(
-        std::span<const float> expected,
-        std::span<const float> actual
-    ) {
-        auto error = errors_.row(errors_.rows().size() - 1);
-        auto derived = derived_.row(derived_.rows().size() - 1);
-        for (auto i = 0u; i < expected.size(); ++i) {
-            error[i] = derived[i] * (expected[i] - actual[i]);
-        }
     }
 
     void hiddenLayerError(MLPerceptron& trainee, int layer) {
