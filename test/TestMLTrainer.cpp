@@ -23,14 +23,14 @@ TEST(TestMLTrainer, testBackpropagation) {
         0.0f
     };
 
-    const auto error = trainer.train(mlp, 0.2, 0.01, 1000000, input, expected, 4);
+    const auto error = trainer.train(mlp, 10, 0.01, 1000000, input, expected, 4);
 
     for (const auto w : mlp.weights()) {
         std::cout << w << ", ";
     }
     std::cout << "\n";
 
-    for(const auto i : mlp.forward(std::vector {0.0f, 1.0f})) {
+    for(const auto i : mlp.forward(&input[2 * 2])) {
         std::cout << i << ", ";
     }
     std::cout << "\n";

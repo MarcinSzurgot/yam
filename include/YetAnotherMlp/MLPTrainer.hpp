@@ -22,8 +22,8 @@ struct MLPTrainer {
         std::span<const float> outputs,
         int samples
     ) -> float {
-        errors_ = std::vector<float>(sum(trainee.topology()));
-        derived_ = std::vector<float>(sum(trainee.topology().subspan(1)));
+        errors_.resize(trainee.neurons().size());
+        derived_.resize(errors_.size() - trainee.topology()[0]);
 
         auto rnd = Random();
 
@@ -45,17 +45,17 @@ struct MLPTrainer {
             std::random_shuffle(indexes.begin(), indexes.end());
 
             for (auto s = 0; s < samples; ++s) {
-                const auto input = inputs.subspan(indexes[s] * inputSize, inputSize);
-                const auto expected = outputs.subspan(indexes[s] * outputSize, outputSize);
+                const auto input = &inputs[indexes[s] * inputSize];
+                const auto expected = &outputs[indexes[s] * outputSize];
                 backpropagate(trainee, learnrate, input, expected, Derivation::sigmoid);
             }
 
             achievedError = 0.0f;
             for (auto s = 0; s < samples; ++s) {
-                const auto input = inputs.subspan(s * inputSize, inputSize);
-                const auto expected = outputs.subspan(s * outputSize, outputSize);
+                const auto input = &inputs[indexes[s] * inputSize];
+                const auto expected = &outputs[indexes[s] * outputSize];
                 const auto actual = trainee.forward(input);
-                achievedError += mse(expected, actual);
+                achievedError += mse({expected, expected + actual.size()}, actual);
             }
             achievedError /= samples;
         }
@@ -63,6 +63,7 @@ struct MLPTrainer {
         return achievedError;
     }
 
+private:
     auto mse(
         std::span<const float> expected,
         std::span<const float> actual
@@ -77,22 +78,22 @@ struct MLPTrainer {
     void backpropagate(
         MLPerceptron& trainee,
         float learnrate,
-        std::span<const float> input,
-        std::span<const float> expected,
+        const float* input,
+        const float* expected,
         derivation_function derivative
     ) {
-        const auto actual = trainee.forward(input);
+        const auto actual = trainee.forward(input).begin().base();
         const auto topology = trainee.topology();
 
         derivative(trainee.neurons().subspan(topology[0]), derived_.begin().base());
 
-        auto error = errors_.end().base() - expected.size();
-        auto derived = derived_.end().base() - expected.size();
-        auto signal = trainee.neurons().end().base() - expected.size();
+        auto error = errors_.end().base() - topology.back();
+        auto derived = derived_.end().base() - topology.back();
+        auto signal = trainee.neurons().end().base() - topology.back();
         auto weight = trainee.weights().end().base();
         auto bias = trainee.biases().end().base();
 
-        lastLayerError(error, derived, actual.begin().base(), expected.begin().base(), topology.back());
+        lastLayerError(error, derived, actual, expected, topology.back());
 
         for (auto layer = topology.size() - 1; layer > 1u; --layer) {
             const auto uc = topology[layer];
@@ -164,7 +165,6 @@ struct MLPTrainer {
         }
     }
 
-private:
     std::vector<float> errors_;
     std::vector<float> derived_;
 };

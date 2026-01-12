@@ -25,9 +25,9 @@ struct MLPerceptron {
         activation_function activation
     ) : MLPerceptron(true, topology, bias, activation) {}
 
-    auto forward(std::span<const float> input) -> std::span<const float> {
+    auto forward(const float* input) -> std::span<const float> {
         auto lower = neurons_.begin().base();
-        auto upper = std::ranges::copy(input, lower).out;
+        auto upper = std::copy(input, input + topology_[0], lower);
         auto last  = neurons_.end().base();
         auto weight = weights_.begin();
         auto bias = biases_.begin().base();
