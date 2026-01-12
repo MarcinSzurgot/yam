@@ -96,9 +96,11 @@ struct MLPTrainer {
         auto weight = trainee.structure().weights().values().end().base();
         auto bias = trainee.structure().biases().values().end().base();
 
+        const auto topology = trainee.structure().topology();
+
         for (auto layer = layers - 1; layer > 1u; --layer) {
-            const auto uc = trainee.structure().topology()[layer];
-            const auto lc = trainee.structure().topology()[layer - 1];
+            const auto uc = topology[layer];
+            const auto lc = topology[layer - 1];
 
             error -= lc;
             derived -= lc;
@@ -111,26 +113,9 @@ struct MLPTrainer {
 
             hiddenLayerError(error, derived, weight, lc, uc);
             correct(error + lc, weight, bias, signal, learnrate, lc, uc);
-
-            // for (auto l = 0u; l < lc; ++l) {
-            //     for (auto u = 0u; u < uc; ++u) {
-            //         *weight++ += learnrate * error[lc + u] * signal[l];
-            //     }
-            // }
-
-            // weight -= lc * uc;
-
-            // if (trainee.structure().biases().rows().size() > 0u) {
-            //     bias -= uc;
-            //     for (auto b = 0u; b < uc; ++b) {
-            //         *bias++ += learnrate * error[lc + b];
-            //     }
-
-            //     bias -= uc;
-            // }
         }
 
-        correct(trainee, learnrate, 0);
+        correct(error + topology[0], weight, bias, signal, learnrate, topology[0], topology[1]);
     }
 
     void hiddenLayerError(
