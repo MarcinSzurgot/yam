@@ -85,18 +85,15 @@ struct MLPTrainer {
 
         derive(trainee.structure().neurons(), derivative);
         const auto layers = trainee.structure().topology().size();
-        for (auto layer = layers; layer > 0u; --layer) {
-            if (layer == layers) {
-                lastLayerError(expected, actual);
-                continue;
-            }
 
-            if (layer - 1) {
-                hiddenLayerError(trainee, layer - 1);
-            }
+        lastLayerError(expected, actual);
 
+        for (auto layer = layers - 1; layer > 1u; --layer) {
+            hiddenLayerError(trainee, layer - 1);
             correct(trainee, learnrate, layer - 1);
         }
+
+        correct(trainee, learnrate, 0);
     }
 
     void lastLayerError(
