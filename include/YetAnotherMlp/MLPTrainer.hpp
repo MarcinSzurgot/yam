@@ -86,18 +86,89 @@ struct MLPTrainer {
         derive(trainee.structure().neurons(), derivative);
         const auto layers = trainee.structure().topology().size();
 
-        auto error = errors_.row(errors_.rows().size() - 1);
-        auto derived = derived_.row(derived_.rows().size() - 1);
+        auto error = errors_.values().end().base() - expected.size();
+        auto derived = derived_.values().end().base() - expected.size();
+        auto signal = trainee.structure().neurons().values().end().base() - expected.size();
         for (auto i = 0u; i < expected.size(); ++i) {
             error[i] = derived[i] * (expected[i] - actual[i]);
         }
 
+        auto weight = trainee.structure().weights().values().end().base();
+        auto bias = trainee.structure().biases().values().end().base();
+
         for (auto layer = layers - 1; layer > 1u; --layer) {
-            hiddenLayerError(trainee, layer - 1);
-            correct(trainee, learnrate, layer - 1);
+            const auto uc = trainee.structure().topology()[layer];
+            const auto lc = trainee.structure().topology()[layer - 1];
+
+            error -= lc;
+            derived -= lc;
+            signal -= lc;
+            weight -= lc * uc;
+
+            if (bias) {
+                bias -= uc;
+            }
+
+            hiddenLayerError(error, derived, weight, lc, uc);
+            correct(error + lc, weight, bias, signal, learnrate, lc, uc);
+
+            // for (auto l = 0u; l < lc; ++l) {
+            //     for (auto u = 0u; u < uc; ++u) {
+            //         *weight++ += learnrate * error[lc + u] * signal[l];
+            //     }
+            // }
+
+            // weight -= lc * uc;
+
+            // if (trainee.structure().biases().rows().size() > 0u) {
+            //     bias -= uc;
+            //     for (auto b = 0u; b < uc; ++b) {
+            //         *bias++ += learnrate * error[lc + b];
+            //     }
+
+            //     bias -= uc;
+            // }
         }
 
         correct(trainee, learnrate, 0);
+    }
+
+    void hiddenLayerError(
+        float* error,
+        float* derived,
+        float* weight,
+        int lc,
+        int uc
+    ) {
+        for (auto l = 0u; l < lc; ++l) {
+            error[l] = 0;
+            for(auto u = 0u; u < uc; ++u) {
+                error[l] += *weight++ * error[lc + u];
+            }
+            error[l] *= derived[l];
+        }
+    }
+
+    void correct(
+        float* error,
+        float* weight,
+        float* bias,
+        float* signal,
+        float learnrate,
+        int lc,
+        int uc
+    ) {
+        for (auto l = 0u; l < lc; ++l) {
+            for (auto u = 0u; u < uc; ++u) {
+                *weight++ += learnrate * error[u] * signal[l];
+            }
+        }
+
+        if (bias) {
+            for (auto b = 0u; b < uc; ++b) {
+                *bias++ += learnrate * error[b];
+            }
+        }
     }
 
     void hiddenLayerError(MLPerceptron& trainee, int layer) {
