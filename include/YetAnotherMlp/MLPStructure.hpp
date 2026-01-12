@@ -21,16 +21,16 @@ struct MLPStructure {
         bool biases
     ) : MLPStructure(true, topology, biases) { }
 
-    auto topology() const -> std::span<const int> { return neurons_.rows(); }
+    auto topology() const -> std::span<const int> { return topology_; }
 
-    auto neurons() const -> const ArrayOfArrays<float>& { return neurons_; }
-    auto neurons()       ->       ArrayOfArrays<float>& { return neurons_; }
+    auto neurons() const -> std::span<const float> { return neurons_; }
+    auto neurons()       -> std::span<      float> { return neurons_; }
 
-    auto weights() const -> const ArrayOfArrays<float>& { return weights_; }
-    auto weights()       ->       ArrayOfArrays<float>& { return weights_; }
+    auto weights() const -> std::span<const float> { return weights_; }
+    auto weights()       -> std::span<      float> { return weights_; }
 
-    auto biases() const -> const ArrayOfArrays<float>& { return biases_; }
-    auto biases()       ->       ArrayOfArrays<float>& { return biases_; }
+    auto biases() const -> std::span<const float> { return biases_; }
+    auto biases()       -> std::span<      float> { return biases_; }
 
 private:
     template<Integers Topology>
@@ -38,9 +38,10 @@ private:
         bool,
         Topology&& topology,
         bool biases
-    ) : neurons_(topology),
-        weights_(weightsLayers(topology)),
-        biases_(biases ? yam::subrange(1, topology) : yam::empty(topology))
+    ) : topology_(std::begin(topology), std::end(topology)),
+        neurons_(sum(topology_)),
+        weights_(sum(weightsLayers(topology))),
+        biases_(sum(biases ? yam::subrange(1, topology) : yam::empty(topology)))
     {
     }
 
@@ -53,9 +54,10 @@ private:
     return layersSizes;
 }
 
-    ArrayOfArrays<float> neurons_;
-    ArrayOfArrays<float> weights_;
-    ArrayOfArrays<float> biases_;
+    std::vector<int> topology_;
+    std::vector<float> neurons_;
+    std::vector<float> weights_;
+    std::vector<float> biases_;
 };
 
 }

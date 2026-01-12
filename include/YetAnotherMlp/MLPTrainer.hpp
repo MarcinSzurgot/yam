@@ -22,13 +22,13 @@ struct MLPTrainer {
         std::span<const float> outputs,
         int samples
     ) -> float {
-        errors_ = ArrayOfArrays<float>(trainee.structure().topology());
-        derived_ = ArrayOfArrays<float>(trainee.structure().topology().subspan(1));
+        errors_ = std::vector<float>(sum(trainee.topology()));
+        derived_ = std::vector<float>(sum(trainee.topology().subspan(1)));
 
         auto rnd = Random();
 
-        rnd.separated(0.3f, 0.2f, trainee.structure().weights().values());
-        rnd.separated(0.3f, 0.2f, trainee.structure().biases().values());
+        rnd.separated(-0.3f, 0.2f, trainee.weights());
+        rnd.separated(-0.3f, 0.2f, trainee.biases());
 
         auto achievedError = 9999999.0f;
 
@@ -82,23 +82,19 @@ struct MLPTrainer {
         derivation_function derivative
     ) {
         const auto actual = trainee.forward(input);
+        const auto topology = trainee.topology();
 
-        derive(trainee.structure().neurons(), derivative);
-        const auto layers = trainee.structure().topology().size();
+        derivative(trainee.neurons().subspan(topology[0]), derived_.begin().base());
 
-        auto error = errors_.values().end().base() - expected.size();
-        auto derived = derived_.values().end().base() - expected.size();
-        auto signal = trainee.structure().neurons().values().end().base() - expected.size();
-        for (auto i = 0u; i < expected.size(); ++i) {
-            error[i] = derived[i] * (expected[i] - actual[i]);
-        }
+        auto error = errors_.end().base() - expected.size();
+        auto derived = derived_.end().base() - expected.size();
+        auto signal = trainee.neurons().end().base() - expected.size();
+        auto weight = trainee.weights().end().base();
+        auto bias = trainee.biases().end().base();
 
-        auto weight = trainee.structure().weights().values().end().base();
-        auto bias = trainee.structure().biases().values().end().base();
+        lastLayerError(error, derived, actual.begin().base(), expected.begin().base(), topology.back());
 
-        const auto topology = trainee.structure().topology();
-
-        for (auto layer = layers - 1; layer > 1u; --layer) {
+        for (auto layer = topology.size() - 1; layer > 1u; --layer) {
             const auto uc = topology[layer];
             const auto lc = topology[layer - 1];
 
@@ -106,16 +102,30 @@ struct MLPTrainer {
             derived -= lc;
             signal -= lc;
             weight -= lc * uc;
-
-            if (bias) {
-                bias -= uc;
-            }
+            bias -= bias ? uc : 0u;
 
             hiddenLayerError(error, derived, weight, lc, uc);
             correct(error + lc, weight, bias, signal, learnrate, lc, uc);
         }
 
-        correct(error + topology[0], weight, bias, signal, learnrate, topology[0], topology[1]);
+        derived -= topology[0];
+        signal -= topology[0];
+        weight -= topology[0] * topology[1];
+        bias -= bias ? topology[1] : 0u;
+
+        correct(error, weight, bias, signal, learnrate, topology[0], topology[1]);
+    }
+
+    void lastLayerError(
+        float* error,
+        const float* derived,
+        const float* actual,
+        const float* expected,
+        int size
+    ) {
+        for (auto i = 0u; i < size; ++i) {
+            error[i] = derived[i] * (expected[i] - actual[i]);
+        }
     }
 
     void hiddenLayerError(
@@ -149,61 +159,14 @@ struct MLPTrainer {
             }
         }
 
-        if (bias) {
-            for (auto b = 0u; b < uc; ++b) {
-                *bias++ += learnrate * error[b];
-            }
+        for (auto b = bias ? 0u : uc; b < uc; ++b) {
+            bias[b] += learnrate * error[b];
         }
-    }
-
-    void hiddenLayerError(MLPerceptron& trainee, int layer) {
-        auto lower = errors_.row(layer);
-        auto upper = errors_.row(layer + 1);
-        auto derived = derived_.row(layer -1);
-        auto weight = trainee.structure().weights().row(layer).begin();
-
-        for (auto l = 0u; l < lower.size(); ++l) {
-            lower[l] = 0;
-            for (auto u = 0u; u < upper.size(); ++u) {
-                lower[l] += *weight++ * upper[u];
-            }
-
-            lower[l] *= derived[l];
-        }
-    }
-
-    void correct(MLPerceptron& trainee, float learnrate, int layer) {
-        auto weight = trainee.structure().weights().row(layer).begin();
-        auto errors = errors_.row(layer + 1);
-        auto signal = trainee.structure().neurons().row(layer);
-
-        for (auto l = 0u; l < signal.size(); ++l) {
-            for (auto u = 0u; u < errors.size(); ++u) {
-                *weight++ += learnrate * errors[u] * signal[l];
-            }
-        }
-
-        if (trainee.structure().biases().rows().size() > 0u) {
-            auto biases = trainee.structure().biases().row(layer);
-            for (auto b = 0u; b < biases.size(); ++b) {
-                biases[b] += learnrate * errors[b];
-            }
-        }
-    }
-
-    void derive(
-        ArrayOfArrays<float>& neurons,
-        derivation_function derivation
-    ) {
-        auto first = neurons.row(1).begin().base();
-        auto last  = neurons.values().end().base();
-
-        derivation({first, last}, derived_.values().begin().base());
     }
 
 private:
-    ArrayOfArrays<float> errors_;
-    ArrayOfArrays<float> derived_;
+    std::vector<float> errors_;
+    std::vector<float> derived_;
 };
 
 }
