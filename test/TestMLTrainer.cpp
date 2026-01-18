@@ -1,13 +1,16 @@
 #include <iostream>
 
+#include <YetAnotherMlp/Dataset.hpp>
 #include <YetAnotherMlp/MLPerceptron.hpp>
 #include <YetAnotherMlp/MLPTrainer.hpp>
 #include <YetAnotherMlp/Random.hpp>
 
 #include <gtest/gtest.h>
 
+
+
 TEST(TestMLTrainer, testBackpropagation) {
-    auto mlp = yam::MLPerceptron({2, 2, 1}, true, yam::Activation::sigmoid);
+    auto mlp = yam::MLPerceptron({2, 5, 1}, true, yam::Activation::sigmoid);
     auto trainer = yam::MLPTrainer();
 
     const auto input = std::vector {
@@ -23,7 +26,9 @@ TEST(TestMLTrainer, testBackpropagation) {
         0.0f
     };
 
-    const auto error = trainer.train(mlp, 10, 0.01, 1000000, input, expected);
+    const auto dataset = yam::Dataset(input, expected, 4);
+
+    const auto error = trainer.train(mlp, 0.5, 0.01, 10000, dataset, yam::Derivation::sigmoid);
 
     for (const auto w : mlp.weights()) {
         std::cout << w << ", ";

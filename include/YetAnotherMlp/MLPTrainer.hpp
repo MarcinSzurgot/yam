@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Activation.hpp"
+#include "Dataset.hpp"
 #include "MLPerceptron.hpp"
-#include <Random.hpp>
+#include "Random.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -18,56 +19,72 @@ struct MLPTrainer {
         float learnrate,
         float error,
         int maxEpochs,
-        std::span<const float> inputs,
-        std::span<const float> outputs
+        const Dataset& dataset,
+        derivation_function derivation
     ) -> float {
-        errors_.resize(trainee.neurons().size());
-        derived_.resize(errors_.size() - trainee.topology()[0]);
+        init(dataset, trainee);
 
-        auto rnd = Random();
-
-        rnd.separated(-0.3f, 0.2f, trainee.weights());
-        rnd.separated(-0.3f, 0.2f, trainee.biases());
-
-        auto achievedError = 9999999.0f;
-
-        const auto inputSize = trainee.topology().front();
-        const auto outputSize = trainee.topology().back();
-        const auto samples = inputs.size() / inputSize;
-
-        auto indexes = std::vector<int>(samples);
-        for (auto i = 0u; i < indexes.size(); ++i) {
-            indexes[i] = i;
-        }
+        auto achievedError = std::numeric_limits<float>::max();
 
         for (auto i = 0; i < maxEpochs && achievedError > error; ++i) {
 
-            std::random_shuffle(indexes.begin(), indexes.end());
+            std::random_shuffle(indexes_.begin(), indexes_.end());
 
-            for (auto s = 0; s < samples; ++s) {
-                const auto input = &inputs[indexes[s] * inputSize];
-                const auto expected = &outputs[indexes[s] * outputSize];
-                backpropagate(trainee, learnrate, input, expected, Derivation::sigmoid);
-            }
+            train(trainee, dataset, derivation, learnrate);
 
-            achievedError = 0.0f;
-            for (auto s = 0; s < samples; ++s) {
-                const auto input = &inputs[indexes[s] * inputSize];
-                const auto expected = &outputs[indexes[s] * outputSize];
-                const auto actual = trainee.forward(input);
-                achievedError += mse({expected, expected + actual.size()}, actual);
-            }
-            achievedError /= samples;
+            achievedError = this->error(dataset, trainee);
         }
 
         return achievedError;
     }
 
 private:
+    auto train(
+        MLPerceptron& trainee, 
+        const Dataset& dataset,
+        derivation_function derivation,
+        float learnrate
+    ) -> void {
+        for(const auto i : indexes_) {
+            const auto input = dataset.input(i).begin().base();
+            const auto expected = dataset.output(i).begin().base();
+            backpropagate(trainee, learnrate, input, expected, derivation);
+        }
+    }
+
+    auto init(const Dataset& dataset, MLPerceptron& trainee) const -> void {
+        errors_.resize(trainee.neurons().size() - trainee.topology()[0]);
+        derived_.resize(errors_.size());
+        indexes_.resize(dataset.size());
+
+        for (auto i = 0u; i < indexes_.size(); ++i) {
+            indexes_[i] = i;
+        }
+
+        auto rnd = Random();
+
+        rnd.separated(-0.3f, 0.2f, trainee.weights());
+        rnd.separated(-0.3f, 0.2f, trainee.biases());
+    }
+
+    auto error(
+        const Dataset& dataset,
+        MLPerceptron& mlp
+    ) const -> float {
+        float error = 0.0f;
+        for(const auto i : indexes_) {
+            const auto input = dataset.input(i).begin().base();
+            const auto expected = dataset.output(i);
+            const auto actual = mlp.forward(input);
+            error += mse(expected, actual);
+        }
+        return error / indexes_.size();
+    }
+
     auto mse(
         std::span<const float> expected,
         std::span<const float> actual
-    ) -> float {
+    ) const -> float {
         auto error = 0.0f;
         for (auto i = 0u; i < expected.size(); ++i) {
             error += (expected[i] - actual[i]) * (expected[i] - actual[i]);
@@ -81,7 +98,7 @@ private:
         const float* input,
         const float* expected,
         derivation_function derivative
-    ) {
+    ) const {
         const auto actual = trainee.forward(input).begin().base();
         const auto topology = trainee.topology();
 
@@ -123,7 +140,7 @@ private:
         const float* actual,
         const float* expected,
         int size
-    ) {
+    ) const {
         for (auto i = 0u; i < size; ++i) {
             error[i] = derived[i] * (expected[i] - actual[i]);
         }
@@ -135,7 +152,7 @@ private:
         float* weight,
         int lc,
         int uc
-    ) {
+    ) const {
         for (auto l = 0u; l < lc; ++l) {
             error[l] = 0;
             for(auto u = 0u; u < uc; ++u) {
@@ -153,7 +170,7 @@ private:
         float learnrate,
         int lc,
         int uc
-    ) {
+    ) const {
         for (auto l = 0u; l < lc; ++l) {
             for (auto u = 0u; u < uc; ++u) {
                 *weight++ += learnrate * error[u] * signal[l];
@@ -165,8 +182,9 @@ private:
         }
     }
 
-    std::vector<float> errors_;
-    std::vector<float> derived_;
+    mutable std::vector<float> errors_;
+    mutable std::vector<float> derived_;
+    mutable std::vector<int> indexes_;
 };
 
 }
