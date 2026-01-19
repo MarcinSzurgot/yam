@@ -26,15 +26,17 @@ struct MLPerceptron {
     ) : MLPerceptron(true, topology, bias, activation) {}
 
     auto forward(const float* input) -> std::span<const float> {
-        auto lower = neurons_.begin().base();
-        auto upper = std::copy(input, input + topology_[0], lower);
+        auto lower = input;
+        auto upper = neurons_.begin().base();
         auto last  = neurons_.end().base();
         auto weight = weights_.begin();
         auto bias = biases_.begin().base();
 
         std::fill(upper, last, 0);
 
-        for (const auto [lc, uc] : adjacent(topology_)) {
+        for (auto layer = 1u; layer < topology_.size(); ++layer) {
+            const auto lc = topology_[layer - 1];
+            const auto uc = topology_[layer - 0];
             for (auto l = 0; l < lc; ++l) {
                 for (auto u = 0; u < uc; ++u) {
                     upper[u] += *weight++ * lower[l];
@@ -71,19 +73,21 @@ private:
         bool bias,
         activation_function activation
     ) : topology_(std::begin(topology), std::end(topology)),
-        neurons_(sum(topology_)),
-        weights_(sum(weightsLayers(topology))),
-        biases_(bias ? sum(topology_) - topology_[0] : 0),
         activation_(activation)
-    {}
+    {
+        auto neuronsAllocationSize = 0u;
+        auto weightsAllocationSize = 0u;
 
-    template<Integers Topology>
-    auto weightsLayers(Topology&& topology) {
-        auto layersSizes = std::vector<int>();
-        for (const auto [lower, upper] : adjacent(topology)) {
-            layersSizes.push_back(lower * upper);
+        for (auto layer = 1u; layer < topology_.size(); ++layer) {
+            const auto lc = topology_[layer - 1];
+            const auto uc = topology_[layer - 0];
+            neuronsAllocationSize += uc;
+            weightsAllocationSize += uc * lc;
         }
-        return layersSizes;
+
+        neurons_.resize(neuronsAllocationSize);
+        biases_.resize(bias ? neuronsAllocationSize : 0u);
+        weights_.resize(weightsAllocationSize);
     }
 
     std::vector<int> topology_;

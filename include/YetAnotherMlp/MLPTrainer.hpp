@@ -21,7 +21,7 @@ struct MLPTrainer {
         int maxEpochs,
         const Dataset& dataset,
         derivation_function derivation
-    ) -> float {
+    ) const -> float {
         init(dataset, trainee);
 
         auto achievedError = std::numeric_limits<float>::max();
@@ -44,7 +44,7 @@ private:
         const Dataset& dataset,
         derivation_function derivation,
         float learnrate
-    ) -> void {
+    ) const -> void {
         for(const auto i : indexes_) {
             const auto input = dataset.input(i).begin().base();
             const auto expected = dataset.output(i).begin().base();
@@ -53,7 +53,7 @@ private:
     }
 
     auto init(const Dataset& dataset, MLPerceptron& trainee) const -> void {
-        errors_.resize(trainee.neurons().size() - trainee.topology()[0]);
+        errors_.resize(trainee.neurons().size());
         derived_.resize(errors_.size());
         indexes_.resize(dataset.size());
 
@@ -102,36 +102,31 @@ private:
         const auto actual = trainee.forward(input).begin().base();
         const auto topology = trainee.topology();
 
-        derivative(trainee.neurons().subspan(topology[0]), derived_.begin().base());
+        derivative(trainee.neurons(), derived_.begin().base());
 
         auto error = errors_.end().base() - topology.back();
         auto derived = derived_.end().base() - topology.back();
-        auto signal = trainee.neurons().end().base() - topology.back();
+        const auto* signal = trainee.neurons().end().base() - topology.back();
         auto weight = trainee.weights().end().base();
         auto bias = trainee.biases().end().base();
 
         lastLayerError(error, derived, actual, expected, topology.back());
 
-        for (auto layer = topology.size() - 1; layer > 1u; --layer) {
-            const auto uc = topology[layer];
-            const auto lc = topology[layer - 1];
+        for (auto layer = topology.size(); layer > 1u; --layer) {
+            const auto uc = topology[layer - 1];
+            const auto lc = topology[layer - 2];
 
             error -= lc;
             derived -= lc;
-            signal -= lc;
+            signal = layer > 2u ? signal - lc : input;
             weight -= lc * uc;
             bias -= bias ? uc : 0u;
 
-            hiddenLayerError(error, derived, weight, lc, uc);
+            if (layer > 2u) {
+                hiddenLayerError(error, derived, weight, lc, uc);
+            }
             correct(error + lc, weight, bias, signal, learnrate, lc, uc);
         }
-
-        derived -= topology[0];
-        signal -= topology[0];
-        weight -= topology[0] * topology[1];
-        bias -= bias ? topology[1] : 0u;
-
-        correct(error, weight, bias, signal, learnrate, topology[0], topology[1]);
     }
 
     void lastLayerError(
@@ -147,9 +142,9 @@ private:
     }
 
     void hiddenLayerError(
-        float* error,
-        float* derived,
-        float* weight,
+              float* error,
+        const float* derived,
+        const float* weight,
         int lc,
         int uc
     ) const {
@@ -163,10 +158,10 @@ private:
     }
 
     void correct(
-        float* error,
-        float* weight,
-        float* bias,
-        float* signal,
+        const float* error,
+              float* weight,
+              float* bias,
+        const float* signal,
         float learnrate,
         int lc,
         int uc
