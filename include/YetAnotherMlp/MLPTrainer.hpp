@@ -24,15 +24,17 @@ struct MLPTrainer {
     ) const -> float {
         init(dataset, trainee);
 
-        auto achievedError = std::numeric_limits<float>::max();
+        auto achievedError = this->error(dataset, trainee);
+
+        std::cout << "Initial error: " << achievedError << "\n";
 
         for (auto i = 0; i < maxEpochs && achievedError > error; ++i) {
-
             std::random_shuffle(indexes_.begin(), indexes_.end());
 
             train(trainee, dataset, derivation, learnrate);
 
             achievedError = this->error(dataset, trainee);
+            std::cout << "Epoch: " << i << ", error: " << achievedError << "\n";
         }
 
         return achievedError;

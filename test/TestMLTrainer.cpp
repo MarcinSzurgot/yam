@@ -3,6 +3,7 @@
 #include <YetAnotherMlp/Dataset.hpp>
 #include <YetAnotherMlp/MLPerceptron.hpp>
 #include <YetAnotherMlp/MLPTrainer.hpp>
+#include <YetAnotherMlp/Mnist.hpp>
 #include <YetAnotherMlp/Random.hpp>
 
 #include <gtest/gtest.h>
@@ -62,4 +63,19 @@ TEST(TestMLTrainer, learningSinus) {
     }
 
     std::cout << actualError << "\n";
+}
+
+TEST(TestMLTrainer, learningMnist) {
+    const auto dataset = yam::Mnist::read(
+        "../resources/train-images.idx3-ubyte", 
+        "../resources/train-labels.idx1-ubyte"
+    );
+    
+    auto mlp = yam::MLPerceptron({28 * 28, 800, 10}, true, yam::Activation::sigmoid);
+
+    const auto trainer = yam::MLPTrainer();
+
+    const auto error = trainer.train(mlp, 0.1, 0.02, 1000, dataset, yam::Derivation::sigmoid);
+
+    std::cout << "Mnist error: " << error << "\n";
 }
