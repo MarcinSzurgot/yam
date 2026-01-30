@@ -19,21 +19,22 @@ struct MLPTrainer {
         float learnrate,
         float error,
         int maxEpochs,
-        const Dataset& dataset,
+        const Dataset& trainset,
+        const Dataset& testset,
         derivation_function derivation
     ) const -> float {
-        init(dataset, trainee);
+        init(trainset, trainee);
 
-        auto achievedError = this->error(dataset, trainee);
+        auto achievedError = this->error(testset, trainee);
 
         std::cout << "Initial error: " << achievedError << "\n";
 
         for (auto i = 0; i < maxEpochs && achievedError > error; ++i) {
             std::random_shuffle(indexes_.begin(), indexes_.end());
 
-            train(trainee, dataset, derivation, learnrate);
+            train(trainee, trainset, derivation, learnrate);
 
-            achievedError = this->error(dataset, trainee);
+            achievedError = this->error(testset, trainee);
             std::cout << "Epoch: " << i << ", error: " << achievedError << "\n";
         }
 
@@ -74,7 +75,7 @@ private:
         MLPerceptron& mlp
     ) const -> float {
         float error = 0.0f;
-        for(const auto i : indexes_) {
+        for(auto i = 0; i < dataset.size(); ++i) {
             const auto input = dataset.input(i).begin().base();
             const auto expected = dataset.output(i);
             const auto actual = mlp.forward(input);

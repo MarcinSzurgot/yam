@@ -30,7 +30,7 @@ TEST(TestMLTrainer, learningXor) {
     const auto expectedError = 0.01;
     auto actualError = std::numeric_limits<float>::max();
     for (auto i = 0; i < 10 && actualError > expectedError; ++i) {
-        actualError = trainer.train(mlp, 20, 0.01, 4000, dataset, yam::Derivation::sigmoid);
+        actualError = trainer.train(mlp, 20, 0.01, 4000, dataset, dataset, yam::Derivation::sigmoid);
     }
 
     ASSERT_LE(actualError, expectedError);
@@ -54,7 +54,7 @@ TEST(TestMLTrainer, learningSinus) {
 
     const auto trainer = yam::MLPTrainer();
 
-    auto actualError = trainer.train(mlp, 0.05, 0.001, 100000, dataset, yam::Derivation::sigmoid);
+    auto actualError = trainer.train(mlp, 0.05, 0.001, 100000, dataset, dataset, yam::Derivation::sigmoid);
 
     for (const auto x : inputs) {
         const auto result = mlp.forward(&x)[0];
@@ -66,16 +66,35 @@ TEST(TestMLTrainer, learningSinus) {
 }
 
 TEST(TestMLTrainer, learningMnist) {
-    const auto dataset = yam::Mnist::read(
+    const auto trainset = yam::Mnist::read(
         "../resources/train-images.idx3-ubyte", 
         "../resources/train-labels.idx1-ubyte"
     );
+
+    const auto testset = yam::Mnist::read(
+        "../resources/t10k-images.idx3-ubyte", 
+        "../resources/t10k-labels.idx1-ubyte"
+    );
     
-    auto mlp = yam::MLPerceptron({28 * 28, 800, 10}, true, yam::Activation::sigmoid);
+    auto mlp = yam::MLPerceptron(
+        {trainset.inputSize(), 100, trainset.outputSize()}, 
+        true, 
+        yam::Activation::sigmoid
+    );
 
     const auto trainer = yam::MLPTrainer();
 
-    const auto error = trainer.train(mlp, 0.1, 0.02, 1000, dataset, yam::Derivation::sigmoid);
+    const auto error = trainer.train(mlp, 0.1, 0.004, 1000, trainset, testset, yam::Derivation::sigmoid);
+
+    for (auto i = 0; i < testset.size(); ++i) {
+        const auto result = mlp.forward(testset.input(i).begin().base());
+        const auto output = testset.output(i);
+
+        const auto actual = result.end() - std::ranges::max_element(result) - 1;
+        const auto expected = output.end() - std::ranges::max_element(output) - 1;
+
+        std::cout << actual << ", " << expected << "\n";
+    }
 
     std::cout << "Mnist error: " << error << "\n";
 }

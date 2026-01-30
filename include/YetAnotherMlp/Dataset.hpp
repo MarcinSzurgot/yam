@@ -31,6 +31,9 @@ public:
     }
 
     auto size() const -> int { return size_; }
+    auto inputSize() const -> int { return size() ? input(0).size() : 0; }
+    auto outputSize() const -> int { return size() ? output(0).size() : 0; }
+
     auto input (int i) const -> std::span<const float> { return batch(inputs_, i); }
     auto input (int i)       -> std::span<      float> { return batch(inputs_, i); }
     auto output(int i) const -> std::span<const float> { return batch(outputs_, i); }
