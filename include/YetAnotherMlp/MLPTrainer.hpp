@@ -4,6 +4,7 @@
 #include "Dataset.hpp"
 #include "MLPerceptron.hpp"
 #include "Random.hpp"
+#include "Mathematics.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -60,39 +61,26 @@ private:
         derived_.resize(errors_.size());
         indexes_.resize(dataset.size());
 
-        for (auto i = 0u; i < indexes_.size(); ++i) {
-            indexes_[i] = i;
-        }
+        std::ranges::copy(std::views::iota(0u, indexes_.size()), indexes_.begin());
 
         auto rnd = Random();
 
-        rnd.separated(-0.3f, 0.2f, trainee.weights());
-        rnd.separated(-0.3f, 0.2f, trainee.biases());
+        rnd.separated(0.3f, 0.2f, trainee.weights());
+        rnd.separated(0.3f, 0.2f, trainee.biases());
     }
 
     auto error(
         const Dataset& dataset,
         MLPerceptron& mlp
     ) const -> float {
-        float error = 0.0f;
-        for(auto i = 0; i < dataset.size(); ++i) {
+        auto errors = std::views::iota(0, dataset.size()) | std::views::transform([&](auto i) {
             const auto input = dataset.input(i).begin().base();
             const auto expected = dataset.output(i);
-            const auto actual = mlp.forward(input);
-            error += mse(expected, actual);
-        }
-        return error / indexes_.size();
-    }
+            const auto actual = mlp.forward(input).begin().base();
+            return yam::distance(expected, actual);
+        });
 
-    auto mse(
-        std::span<const float> expected,
-        std::span<const float> actual
-    ) const -> float {
-        auto error = 0.0f;
-        for (auto i = 0u; i < expected.size(); ++i) {
-            error += (expected[i] - actual[i]) * (expected[i] - actual[i]);
-        }
-        return std::sqrt(error / expected.size());
+        return std::ranges::fold_left(errors, 0.0f, std::plus<>{}) / dataset.size();
     }
     
     void backpropagate(

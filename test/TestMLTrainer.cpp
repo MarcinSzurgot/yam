@@ -84,7 +84,7 @@ TEST(TestMLTrainer, learningMnist) {
 
     const auto trainer = yam::MLPTrainer();
 
-    const auto error = trainer.train(mlp, 0.1, 0.004, 1000, trainset, testset, yam::Derivation::sigmoid);
+    const auto error = trainer.train(mlp, 0.1, 0.07, 1000, trainset, testset, yam::Derivation::sigmoid);
 
     for (auto i = 0; i < testset.size(); ++i) {
         const auto result = mlp.forward(testset.input(i).begin().base());

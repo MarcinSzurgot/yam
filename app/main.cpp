@@ -19,7 +19,7 @@ auto window() -> std::unique_ptr<sf::RenderWindow> {
 
 }
 
-struct HeatMap: sf::Drawable {
+struct HeatMap: sf::Drawable, sf::Transformable {
     HeatMap(
         sf::Vector2u resolution, 
         sf::Vector2f size,
@@ -34,6 +34,7 @@ struct HeatMap: sf::Drawable {
     }
 
     void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
+        states.transform *= getTransform();
         target.draw(rects_, states);
     }
 
@@ -46,7 +47,7 @@ struct HeatMap: sf::Drawable {
         };
         for (auto i = 0u; i < values.size(); ++i) {
             const auto row = i / resolution_.x;
-            const auto col = i % resolution_.y;
+            const auto col = i % resolution_.x;
             const auto brightness = 255.0f * (values[i] - min) / (max - min);
             const auto color = sf::Color(brightness, brightness, brightness);
 
@@ -80,44 +81,35 @@ auto mnist() -> yam::MLPerceptron {
     );
     
     auto mlp = yam::MLPerceptron(
-        {trainset.inputSize(), trainset.outputSize()}, 
-        true, 
+        {trainset.inputSize(), 500, 400, 300, 200, 100, trainset.outputSize()}, 
+        false, 
         yam::Activation::sigmoid
     );
 
     const auto trainer = yam::MLPTrainer();
 
-    trainer.train(mlp, 0.1, 0.011, 1000, trainset, testset, yam::Derivation::sigmoid);
+    trainer.train(mlp, 0.1, 0.035, 5, trainset, testset, yam::Derivation::sigmoid);
 
     return mlp;
 }
 
 int main() {
     const auto mlp = mnist();
-
-    const auto resolution = sf::Vector2u(280, 28);
-    auto values = std::vector<float>(resolution.x * resolution.y);
-
-    auto weightsToValues = [](
-        std::span<const float> weights,
-        std::span<      float> values
-    ) {
-        auto weight = weights.begin();
-        for (auto o = 0; o < 28 * 28; ++o) {
-            for (auto i = 0; i < 10; ++i) {
-                values[i * 28 * 28 + o] = weight[i * 28 * 28];
-            }
-            weight++;
-        }
-    };
-
-    weightsToValues(mlp.weights(), values);
-
-    const auto heatMap = HeatMap(
-        resolution,
-        {1000, 100},
-        mlp.weights()
+    const auto layerSize = mlp.topology()[mlp.topology().size() - 2];
+    const auto resolution = sf::Vector2u(
+        std::sqrt(layerSize), 
+        std::sqrt(layerSize)
     );
+
+    auto heatMaps = std::vector<HeatMap>();
+    for (auto d = 0; d < 10; ++d) {
+        heatMaps.emplace_back(HeatMap(
+            resolution,
+            {90, 90},
+            mlp.weights().subspan(d * layerSize, layerSize)
+        ));
+        heatMaps.back().setPosition(d * 100 + 5, 5);
+    }
 
     for (auto window = ::window(); window->isOpen(); window->display()) {
         for (auto event = sf::Event(); window->pollEvent(event);) {
@@ -127,7 +119,9 @@ int main() {
         }
 
         window->clear();
-        window->draw(heatMap);
+        for (const auto map : heatMaps) {
+            window->draw(map);
+        }
     }
     return 0;
 }
