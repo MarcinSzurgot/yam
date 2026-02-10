@@ -13,49 +13,29 @@
 namespace yam {
 
 struct MLPTrainer {
-    MLPTrainer(
-        MLPerceptron trainee,
-        Dataset trainset,
-        Dataset testset,
-        derivation_function derivative,
+    MLPTrainer() {}
+
+    auto train(
+        MLPerceptron& trainee,
         float learnrate,
-        float minError,
-        int maxEpochs
-    ) : trainee_(std::move(trainee)),
-        trainset_(std::move(trainset)),
-        testset_(std::move(testset)),
-        derivative_(derivative),
-        learnrate_(learnrate),
-        minError_(minError),
-        maxEpochs_(maxEpochs),
-        errors_(trainee_.neurons().size()),
-        derived_(trainee_.neurons().size()),
-        indexes_(trainset_.size())
-    {
-        std::ranges::copy(std::views::iota(0u, indexes_.size()), indexes_.begin());
+        float error,
+        int maxEpochs,
+        const Dataset& trainset,
+        const Dataset& testset,
+        derivation_function derivation
+    ) const -> float {
+        init(trainset, trainee);
 
-        auto rnd = Random();
-
-        rnd.separated(0.3f, 0.2f, trainee.weights());
-        rnd.separated(0.3f, 0.2f, trainee.biases());
-    }
-
-    auto trainee() -> MLPerceptron& {
-        return trainee_;
-    }
-
-    auto train() -> float {
-
-        auto achievedError = this->error(testset_, trainee_);
+        auto achievedError = this->error(testset, trainee);
 
         std::cout << "Initial error: " << achievedError << "\n";
 
-        for (auto i = 0; i < maxEpochs_ && achievedError > minError_; ++i) {
+        for (auto i = 0; i < maxEpochs && achievedError > error; ++i) {
             std::random_shuffle(indexes_.begin(), indexes_.end());
 
-            train(trainee_, trainset_, derivative_, learnrate_);
+            train(trainee, trainset, derivation, learnrate);
 
-            achievedError = this->error(testset_, trainee_);
+            achievedError = this->error(testset, trainee);
             std::cout << "Epoch: " << i << ", error: " << achievedError << "\n";
         }
 
@@ -74,6 +54,19 @@ private:
             const auto expected = dataset.output(i).begin().base();
             backpropagate(trainee, learnrate, input, expected, derivation);
         }
+    }
+
+    auto init(const Dataset& dataset, MLPerceptron& trainee) const -> void {
+        errors_.resize(trainee.neurons().size());
+        derived_.resize(errors_.size());
+        indexes_.resize(dataset.size());
+
+        std::ranges::copy(std::views::iota(0u, indexes_.size()), indexes_.begin());
+
+        auto rnd = Random();
+
+        rnd.separated(0.3f, 0.2f, trainee.weights());
+        rnd.separated(0.3f, 0.2f, trainee.biases());
     }
 
     auto error(
@@ -174,17 +167,6 @@ private:
             bias[b] += learnrate * error[b];
         }
     }
-
-    MLPerceptron trainee_;
-
-    Dataset testset_;
-    Dataset trainset_;
-    
-    derivation_function derivative_;
-
-    float learnrate_;
-    float minError_;
-    int maxEpochs_;
 
     mutable std::vector<float> errors_;
     mutable std::vector<float> derived_;

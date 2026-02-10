@@ -81,18 +81,16 @@ auto mnist() -> yam::MLPerceptron {
     );
     
     auto mlp = yam::MLPerceptron(
-        {trainset.inputSize(), trainset.outputSize()}, 
+        {trainset.inputSize(), 500, 400, 300, 200, 100, trainset.outputSize()}, 
         false, 
         yam::Activation::sigmoid
     );
 
-    auto trainer = yam::MLPTrainer(
-        mlp, std::move(testset), std::move(trainset), yam::Derivation::sigmoid, 0.1, 0.035, 5
-    );
+    const auto trainer = yam::MLPTrainer();
 
-    trainer.train();
+    trainer.train(mlp, 0.1, 0.035, 5, trainset, testset, yam::Derivation::sigmoid);
 
-    return std::move(trainer.trainee());
+    return mlp;
 }
 
 int main() {
