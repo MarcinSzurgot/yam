@@ -38,17 +38,23 @@ struct HeatMap: sf::Drawable, sf::Transformable {
         target.draw(rects_, states);
     }
 
-    void update(std::span<const float> values) {
+    template<std::ranges::forward_range Values>
+    requires(std::floating_point<std::ranges::range_value_t<Values>>)
+    void update(Values&& values) {
+        using namespace std::views;
+
         const auto min = std::ranges::min(values);
         const auto max = std::ranges::max(values);
+        const auto range = std::max(std::fabs(max - min), decltype(max)(1));
         const auto rectSize = sf::Vector2f { 
             size_.x / resolution_.x, 
             size_.y / resolution_.y 
         };
-        for (auto i = 0u; i < values.size(); ++i) {
+
+        for(const auto [i, value] : zip(iota(0), values)) {
             const auto row = i / resolution_.x;
             const auto col = i % resolution_.x;
-            const auto brightness = 255.0f * (values[i] - min) / (max - min);
+            const auto brightness = 255.0f * (value - min) / range;
             const auto color = sf::Color(brightness, brightness, brightness);
 
             rects_[i * 4 + 0].position = {rectSize.x * (col + 0), rectSize.y * (row + 0)};
@@ -81,16 +87,16 @@ auto mnist() -> yam::MLPerceptron {
     );
     
     auto mlp = yam::MLPerceptron(
-        {trainset.inputSize(), 500, 400, 300, 200, 100, trainset.outputSize()}, 
+        {trainset.inputSize(), trainset.outputSize()}, 
         false, 
         yam::Activation::sigmoid
     );
 
-    const auto trainer = yam::MLPTrainer();
+    auto trainer = yam::MLPTrainer(mlp, 0.1, 0.035, 5, trainset, testset, yam::Derivation::sigmoid);
 
-    trainer.train(mlp, 0.1, 0.035, 5, trainset, testset, yam::Derivation::sigmoid);
+    trainer.trainFully();
 
-    return mlp;
+    return trainer.trainee();
 }
 
 int main() {

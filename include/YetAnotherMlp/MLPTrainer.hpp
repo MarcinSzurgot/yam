@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Activation.hpp"
+#include "Algorit.hpp"
 #include "Dataset.hpp"
 #include "MLPerceptron.hpp"
 #include "Random.hpp"
@@ -15,32 +16,95 @@ namespace yam {
 struct MLPTrainer {
     MLPTrainer() {}
 
-    auto train(
-        MLPerceptron& trainee,
+    MLPTrainer(
+        MLPerceptron trainee,
         float learnrate,
         float error,
         int maxEpochs,
         const Dataset& trainset,
         const Dataset& testset,
         derivation_function derivation
-    ) const -> float {
-        init(trainset, trainee);
+    ) : trainee_(std::move(trainee)),
+        learnrate_(learnrate),
+        error_(error),
+        maxEpochs_(maxEpochs),
+        trainset_(trainset),
+        testset_(testset),
+        derivation_(derivation)
+    {
 
-        auto achievedError = this->error(testset, trainee);
-
-        std::cout << "Initial error: " << achievedError << "\n";
-
-        for (auto i = 0; i < maxEpochs && achievedError > error; ++i) {
-            std::random_shuffle(indexes_.begin(), indexes_.end());
-
-            train(trainee, trainset, derivation, learnrate);
-
-            achievedError = this->error(testset, trainee);
-            std::cout << "Epoch: " << i << ", error: " << achievedError << "\n";
-        }
-
-        return achievedError;
     }
+
+    struct Result {
+        float error;
+        int epoch;
+        MLPerceptron* trainee;
+    };
+
+    auto begin() {
+        init(trainset_, trainee_);
+
+        auto initial = Result {
+            .error = this->error(testset_, trainee_),
+            .epoch = 0,
+            .trainee = std::addressof(trainee_)
+        };
+
+        std::cout << "Initial error: " << initial.error << "\n";
+
+        return Algorit(
+            initial,
+            [this](auto&& i) { return true; },
+            [this](auto&& i) { 
+                std::random_shuffle(indexes_.begin(), indexes_.end());
+
+                train(trainee_, trainset_, derivation_, learnrate_);
+
+                i.error = this->error(testset_, trainee_);
+                i.epoch++;
+                std::cout << "Epoch: " << i.epoch << ", error: " << i.error << "\n";
+            }
+        );
+    }
+
+    auto end() {
+        return std::default_sentinel;
+    }
+
+    auto training() { 
+        return std::ranges::subrange(begin(), end())
+        | std::views::drop_while([this](auto&& i) {
+            return i.error > error_ && i.epoch >= maxEpochs_;
+        });
+    }
+
+    auto trainFully() -> float {
+        // init(trainset_, trainee_);
+
+        // auto achievedError = this->error(testset_, trainee_);
+
+        // std::cout << "Initial error: " << achievedError << "\n";
+
+        // for (auto i = 0; i < maxEpochs_ && achievedError > error_; ++i) {
+        //     std::random_shuffle(indexes_.begin(), indexes_.end());
+
+        //     train(trainee_, trainset_, derivation_, learnrate_);
+
+        //     achievedError = this->error(testset_, trainee_);
+        //     std::cout << "Epoch: " << i << ", error: " << achievedError << "\n";
+        // }
+
+        // return achievedError;
+
+        return std::ranges::find_if(
+            std::ranges::subrange(this->begin(), this->end()), 
+            [this](auto&& i) {
+                return i.error <= error_ || i.epoch >= maxEpochs_;
+            }
+        )->error;
+    }
+
+    auto trainee() -> MLPerceptron& { return trainee_; }
 
 private:
     auto train(
@@ -171,6 +235,14 @@ private:
     mutable std::vector<float> errors_;
     mutable std::vector<float> derived_;
     mutable std::vector<int> indexes_;
+
+    MLPerceptron trainee_;
+    float learnrate_;
+    float error_;
+    int maxEpochs_;
+    Dataset trainset_;
+    Dataset testset_;
+    derivation_function derivation_;
 };
 
 }

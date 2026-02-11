@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Activation.hpp"
 #include "MLPStructure.hpp"
 #include "Utils.hpp"
 
@@ -10,6 +11,8 @@ namespace yam {
 struct MLPerceptron {
 
     using activation_function = std::function<float*(std::span<const float>, float*)>;
+
+    MLPerceptron() : MLPerceptron({1, 1}, false, yam::Activation::linear) { }
 
     template<Integers Topology>
     MLPerceptron(

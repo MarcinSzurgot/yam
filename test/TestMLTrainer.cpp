@@ -10,7 +10,6 @@
 
 TEST(TestMLTrainer, learningXor) {
     auto mlp = yam::MLPerceptron({2, 2, 1}, true, yam::Activation::sigmoid);
-    const auto trainer = yam::MLPTrainer();
 
     const auto input = std::vector {
         1.0f, 0.0f,
@@ -28,9 +27,12 @@ TEST(TestMLTrainer, learningXor) {
     const auto dataset = yam::Dataset(input, expected, 4);
 
     const auto expectedError = 0.01;
+
+    auto trainer = yam::MLPTrainer(mlp, 20, 0.01, 4000, dataset, dataset, yam::Derivation::sigmoid);
+
     auto actualError = std::numeric_limits<float>::max();
     for (auto i = 0; i < 10 && actualError > expectedError; ++i) {
-        actualError = trainer.train(mlp, 20, 0.01, 4000, dataset, dataset, yam::Derivation::sigmoid);
+        actualError = trainer.trainFully();
     }
 
     ASSERT_LE(actualError, expectedError);
@@ -52,9 +54,9 @@ TEST(TestMLTrainer, learningSinus) {
 
     auto mlp = yam::MLPerceptron({1, 20, 10, 5, 1}, true, yam::Activation::sigmoid);
 
-    const auto trainer = yam::MLPTrainer();
+    auto trainer = yam::MLPTrainer(mlp, 0.05, 0.001, 100000, dataset, dataset, yam::Derivation::sigmoid);
 
-    auto actualError = trainer.train(mlp, 0.05, 0.001, 100000, dataset, dataset, yam::Derivation::sigmoid);
+    auto actualError = trainer.trainFully();
 
     for (const auto x : inputs) {
         const auto result = mlp.forward(&x)[0];
@@ -82,12 +84,12 @@ TEST(TestMLTrainer, learningMnist) {
         yam::Activation::sigmoid
     );
 
-    const auto trainer = yam::MLPTrainer();
+    auto trainer = yam::MLPTrainer(mlp, 0.1, 0.07, 1000, trainset, testset, yam::Derivation::sigmoid);
 
-    const auto error = trainer.train(mlp, 0.1, 0.07, 1000, trainset, testset, yam::Derivation::sigmoid);
+    const auto error = trainer.trainFully();
 
     for (auto i = 0; i < testset.size(); ++i) {
-        const auto result = mlp.forward(testset.input(i).begin().base());
+        const auto result = trainer.trainee().forward(testset.input(i).begin().base());
         const auto output = testset.output(i);
 
         const auto actual = result.end() - std::ranges::max_element(result) - 1;
