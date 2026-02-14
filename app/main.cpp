@@ -75,7 +75,7 @@ private:
     sf::Vector2f size_;
 };
 
-auto mnist() -> yam::MLPerceptron {
+auto mnistTrainer() -> yam::MLPTrainer {
         const auto trainset = yam::Mnist::read(
         "../resources/train-images.idx3-ubyte", 
         "../resources/train-labels.idx1-ubyte"
@@ -92,15 +92,10 @@ auto mnist() -> yam::MLPerceptron {
         yam::Activation::sigmoid
     );
 
-    auto trainer = yam::MLPTrainer(mlp, 0.1, 0.035, 20, trainset, testset, yam::Derivation::sigmoid);
-
-    return *trainer.train([](auto&& result) {
-        std::cout << "iteration: " << result.epoch << ", error: " << result.error << "\n";
-    }).trainee;
+    return yam::MLPTrainer(mlp, 0.1, 0.035, 20, trainset, testset, yam::Derivation::sigmoid);
 }
 
-int main() {
-    const auto mlp = mnist();
+auto heatMaps(const yam::MLPerceptron& mlp) -> std::vector<HeatMap> {
     const auto layerSize = mlp.topology()[mlp.topology().size() - 2];
     const auto resolution = sf::Vector2u(
         std::sqrt(layerSize), 
@@ -116,8 +111,30 @@ int main() {
         ));
         heatMaps.back().setPosition(d * 100 + 5, 5);
     }
+    return heatMaps;
+}
+
+int main() {
+    // std::cout << "iteration: " << result.epoch << ", error: " << result.error << "\n";
+    auto trainer = mnistTrainer();
+    auto first = trainer.begin();
+    auto mlp = *first->trainee;
+    auto heatMaps = ::heatMaps(mlp);
+
+    const auto interval = std::chrono::seconds(2);
+
+    auto time = std::chrono::high_resolution_clock::now();
 
     for (auto window = ::window(); window->isOpen(); window->display()) {
+        const auto now = std::chrono::high_resolution_clock::now();
+        if ((now - time > interval) && !first->isTrained()) {
+            time = now;
+            ++first;
+            const auto result = *first;
+            std::cout << "iteration: " << result.epoch << ", error: " << result.error << "\n";
+            heatMaps = ::heatMaps(*first->trainee);
+        }
+
         for (auto event = sf::Event(); window->pollEvent(event);) {
             if (event.type == sf::Event::Closed) {
                 window->close();
