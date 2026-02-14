@@ -92,11 +92,11 @@ auto mnist() -> yam::MLPerceptron {
         yam::Activation::sigmoid
     );
 
-    auto trainer = yam::MLPTrainer(mlp, 0.1, 0.035, 5, trainset, testset, yam::Derivation::sigmoid);
+    auto trainer = yam::MLPTrainer(mlp, 0.1, 0.035, 20, trainset, testset, yam::Derivation::sigmoid);
 
-    trainer.trainFully();
-
-    return trainer.trainee();
+    return *trainer.train([](auto&& result) {
+        std::cout << "iteration: " << result.epoch << ", error: " << result.error << "\n";
+    }).trainee;
 }
 
 int main() {

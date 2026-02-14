@@ -32,7 +32,7 @@ TEST(TestMLTrainer, learningXor) {
 
     auto actualError = std::numeric_limits<float>::max();
     for (auto i = 0; i < 10 && actualError > expectedError; ++i) {
-        actualError = trainer.trainFully();
+        actualError = trainer.train().error;
     }
 
     ASSERT_LE(actualError, expectedError);
@@ -56,7 +56,7 @@ TEST(TestMLTrainer, learningSinus) {
 
     auto trainer = yam::MLPTrainer(mlp, 0.05, 0.001, 100000, dataset, dataset, yam::Derivation::sigmoid);
 
-    auto actualError = trainer.trainFully();
+    auto actualError = trainer.train().error;
 
     for (const auto x : inputs) {
         const auto result = mlp.forward(&x)[0];
@@ -86,7 +86,9 @@ TEST(TestMLTrainer, learningMnist) {
 
     auto trainer = yam::MLPTrainer(mlp, 0.1, 0.07, 1000, trainset, testset, yam::Derivation::sigmoid);
 
-    const auto error = trainer.trainFully();
+    const auto error = trainer.train([](auto&& result) {
+        std::cout << "iteration: " << result.epoch << ", error: " << result.error << "\n";
+    }).error;
 
     for (auto i = 0; i < testset.size(); ++i) {
         const auto result = trainer.trainee().forward(testset.input(i).begin().base());

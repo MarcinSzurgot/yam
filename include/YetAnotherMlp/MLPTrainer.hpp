@@ -36,21 +36,36 @@ struct MLPTrainer {
     }
 
     struct Result {
+        float targetError;
+        int maxEpochs;
+
         float error;
         int epoch;
         MLPerceptron* trainee;
+
+        auto isTrained() const {
+            return error <= targetError || epoch >= maxEpochs;
+        }
+
+        friend auto operator==(
+            const Result& lhs,
+            const Result& rhs
+        ) -> bool {
+            return lhs.epoch == rhs.epoch && lhs.error == rhs.error;
+        }
     };
 
     auto begin() {
         init(trainset_, trainee_);
 
         auto initial = Result {
+            .targetError = this->error_,
+            .maxEpochs = this->maxEpochs_,
+
             .error = this->error(testset_, trainee_),
             .epoch = 0,
             .trainee = std::addressof(trainee_)
         };
-
-        std::cout << "Initial error: " << initial.error << "\n";
 
         return Algorit(
             initial,
@@ -62,7 +77,6 @@ struct MLPTrainer {
 
                 i.error = this->error(testset_, trainee_);
                 i.epoch++;
-                std::cout << "Epoch: " << i.epoch << ", error: " << i.error << "\n";
             }
         );
     }
@@ -71,37 +85,14 @@ struct MLPTrainer {
         return std::default_sentinel;
     }
 
-    auto training() { 
-        return std::ranges::subrange(begin(), end())
-        | std::views::drop_while([this](auto&& i) {
-            return i.error > error_ && i.epoch >= maxEpochs_;
+    auto train() -> Result { return train([](auto&&){}); }
+
+    template<typename OnEpoch>
+    auto train(OnEpoch&& callback) -> Result {
+        return *std::ranges::find_if(*this, [&](auto&& result) { 
+            callback(result);
+            return result.isTrained(); 
         });
-    }
-
-    auto trainFully() -> float {
-        // init(trainset_, trainee_);
-
-        // auto achievedError = this->error(testset_, trainee_);
-
-        // std::cout << "Initial error: " << achievedError << "\n";
-
-        // for (auto i = 0; i < maxEpochs_ && achievedError > error_; ++i) {
-        //     std::random_shuffle(indexes_.begin(), indexes_.end());
-
-        //     train(trainee_, trainset_, derivation_, learnrate_);
-
-        //     achievedError = this->error(testset_, trainee_);
-        //     std::cout << "Epoch: " << i << ", error: " << achievedError << "\n";
-        // }
-
-        // return achievedError;
-
-        return std::ranges::find_if(
-            std::ranges::subrange(this->begin(), this->end()), 
-            [this](auto&& i) {
-                return i.error <= error_ || i.epoch >= maxEpochs_;
-            }
-        )->error;
     }
 
     auto trainee() -> MLPerceptron& { return trainee_; }
