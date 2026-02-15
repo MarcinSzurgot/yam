@@ -150,29 +150,54 @@ private:
 
         derivative(trainee.neurons(), derived_.begin().base());
 
-        auto error = errors_.end().base() - topology.back();
-        auto derived = derived_.end().base() - topology.back();
-        const auto* signal = trainee.neurons().end().base() - topology.back();
-        auto weight = trainee.weights().end().base();
-        auto bias = trainee.biases().end().base();
+        struct Pointers {
+            float* error;
+            float* derived;
+            float* signal;
+            float* weight;
+            float* bias;
 
-        lastLayerError(error, derived, actual, expected, topology.back());
+            auto operator-=(const std::pair<std::ptrdiff_t, std::ptrdiff_t>& layer) -> Pointers& {
+                const auto [uc, lc] = layer;
 
-        for (auto layer = topology.size(); layer > 1u; --layer) {
-            const auto uc = topology[layer - 1];
-            const auto lc = topology[layer - 2];
+                error -= lc;
+                derived -= lc;
+                signal -= lc;
+                weight -= lc * uc;
+                bias -= bias ? uc : 0u;
 
-            error -= lc;
-            derived -= lc;
-            signal = layer > 2u ? signal - lc : input;
-            weight -= lc * uc;
-            bias -= bias ? uc : 0u;
-
-            if (layer > 2u) {
-                hiddenLayerError(error, derived, weight, lc, uc);
+                return *this;
             }
-            correct(error + lc, weight, bias, signal, learnrate, lc, uc);
+        };
+
+        auto pointers = Pointers {
+            .error = errors_.end().base() - topology.back(),
+            .derived = derived_.end().base() - topology.back(),
+            .signal = trainee.neurons().end().base() - topology.back(),
+            .weight = trainee.weights().end().base(),
+            .bias = trainee.biases().end().base()
+        };
+
+        lastLayerError(pointers.error, pointers.derived, actual, expected, topology.back());
+
+        auto layers = topology
+        | std::views::drop(1)
+        | std::views::reverse
+        | std::views::adjacent<2>;
+
+        for (const auto& layer : layers) {
+            pointers -= layer;
+
+            hiddenLayerError(pointers.error, pointers.derived, pointers.weight, layer.second, layer.first);
+            correct(pointers.error + layer.second, pointers.weight, pointers.bias, pointers.signal, learnrate, layer.second, layer.first);
         }
+
+        const auto lc = topology[0];
+        const auto uc = topology[1];
+
+        pointers -= {uc, lc};
+
+        correct(pointers.error + lc, pointers.weight, pointers.bias, input, learnrate, lc, uc);
     }
 
     void lastLayerError(

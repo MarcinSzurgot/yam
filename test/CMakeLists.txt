@@ -17,7 +17,6 @@ add_executable(
     ${PROJECT_NAME} 
     
     TestMLPerceptron.cpp
-    TestMLPStructure.cpp
     TestMLTrainer.cpp
     TestUtils.cpp
 

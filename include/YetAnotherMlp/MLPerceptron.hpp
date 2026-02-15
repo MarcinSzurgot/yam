@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Activation.hpp"
-#include "MLPStructure.hpp"
 #include "Utils.hpp"
 
 #include <functional>
@@ -37,9 +36,7 @@ struct MLPerceptron {
 
         std::fill(upper, last, 0);
 
-        for (auto layer = 1u; layer < topology_.size(); ++layer) {
-            const auto lc = topology_[layer - 1];
-            const auto uc = topology_[layer - 0];
+        for (const auto [lc, uc] : std::views::adjacent<2>(topology_)) {
             for (auto l = 0; l < lc; ++l) {
                 for (auto u = 0; u < uc; ++u) {
                     upper[u] += *weight++ * lower[l];
@@ -78,19 +75,20 @@ private:
     ) : topology_(std::begin(topology), std::end(topology)),
         activation_(activation)
     {
-        auto neuronsAllocationSize = 0u;
-        auto weightsAllocationSize = 0u;
+        const auto [neurons, weights] = std::ranges::fold_left(
+            std::views::adjacent<2>(topology_),
+            std::pair<int, int>(),
+            [](auto&& r, auto&& c) {
+                return std::make_pair(
+                    r.first  + c.second, // summing neurons of upper layers
+                    r.second + c.second * c.first // multiplicating neurons of adjacent layers
+                );
+            }
+        );
 
-        for (auto layer = 1u; layer < topology_.size(); ++layer) {
-            const auto lc = topology_[layer - 1];
-            const auto uc = topology_[layer - 0];
-            neuronsAllocationSize += uc;
-            weightsAllocationSize += uc * lc;
-        }
-
-        neurons_.resize(neuronsAllocationSize);
-        biases_.resize(bias ? neuronsAllocationSize : 0u);
-        weights_.resize(weightsAllocationSize);
+        neurons_.resize(neurons);
+        biases_.resize(bias ? neurons : 0u);
+        weights_.resize(weights);
     }
 
     std::vector<int> topology_;
