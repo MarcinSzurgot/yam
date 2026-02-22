@@ -219,11 +219,13 @@ private:
         int lc,
         int uc
     ) const {
-        for (auto l = 0u; l < lc; ++l) {
-            error[l] = 0;
-            for(auto u = 0u; u < uc; ++u) {
+        for(auto u = 0u; u < uc; ++u) {
+            for (auto l = 0u; l < lc; ++l) {    
                 error[l] += *weight++ * error[lc + u];
             }
+        }
+
+        for (auto l = 0u; l < lc; ++l) {    
             error[l] *= derived[l];
         }
     }
@@ -237,8 +239,8 @@ private:
         int lc,
         int uc
     ) const {
-        for (auto l = 0u; l < lc; ++l) {
-            for (auto u = 0u; u < uc; ++u) {
+        for (auto u = 0u; u < uc; ++u) {
+            for (auto l = 0u; l < lc; ++l) {
                 *weight++ += learnrate * error[u] * signal[l];
             }
         }

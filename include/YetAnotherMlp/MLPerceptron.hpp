@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Activation.hpp"
+#include "Mathematics.hpp"
 #include "Utils.hpp"
 
 #include <functional>
@@ -37,11 +38,18 @@ struct MLPerceptron {
         std::fill(upper, last, 0);
 
         for (const auto [lc, uc] : std::views::adjacent<2>(topology_)) {
-            for (auto l = 0; l < lc; ++l) {
-                for (auto u = 0; u < uc; ++u) {
-                    upper[u] += *weight++ * lower[l];
-                }
-            }
+            // for (auto u = 0; u < uc; ++u) {
+            //     for (auto l = 0; l < lc; ++l) {
+            //         upper[u] += *weight++ * lower[l];
+            //     }
+            // }
+
+            matmul(
+                std::span(weight, weight + uc * lc),
+                std::span(lower, lower + lc),
+                upper,
+                lc
+            );
 
             for (auto u = bias ? 0 : uc; u < uc; ++u) {
                 upper[u] += *bias++;
